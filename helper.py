@@ -1,5 +1,6 @@
 import json
 import os
+import random
 import shutil
 
 
@@ -90,6 +91,36 @@ def get_val_data():
     with open("model_val_data", "w") as file:
         file.write(json.dumps(val_data))
 
-get_val_data()
+
+def get_25_lantency():
+    print([random.randint(1000, 10000) / 10000 for i in range(25)])
+
+# 制作测试集文件
+def create_val_data():
+    file_url = "C:\\Users\\lily\\PycharmProjects\\Finland_road_data\\yolo_data\\clients\\{}\\clinet{}"
+    type_names = ["high_way"]
+    tmp = ""
+    tmp_val = ""
+    for type_name in type_names:
+        for pos in range(25):
+            files = get_all_filenames(file_url.format(type_name, str(pos)))
+            files_val = get_all_filenames(file_url.format(type_name, str(pos) + "_val"))
+            for file in files:
+                if file.find("labels.cache") == -1 and file.find(".txt") == -1:
+                    tmp += file + "\n"
+            for file in files_val:
+                if file.find("labels.cache") == -1 and file.find(".txt") == -1:
+                    tmp_val += file + "\n"
+
+    tmp_val = tmp_val[:-1]
+    tmp = tmp[:-1]
+    with open("./dqn_data", "w") as file:
+        file.write(tmp)
+    with open("./dqn_val_data", "w") as file:
+        file.write(tmp_val)
+
+
+
+# get_val_data()
 # create_txt()
 # create_data()

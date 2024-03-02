@@ -8,9 +8,19 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-import autoencoder
-from autoencoder import AutoCoder1
 
+import os
+import torch
+import argparse
+from tqdm import tqdm
+
+from torchsummary import summary
+from pca_helper import get_pca_by_model
+from model_util import get_params_by_model, sum_model
+
+import utils.utils
+import utils.datasets
+import model.detector as detector
 
 class Type(Enum):
     crossing = "crossing"
@@ -23,130 +33,137 @@ class Environment:
         super().__init__()
         # self.meta_url = "C:\\Users\\lily\\PycharmProjects\\zhangruoyi\\yolov5\\results2\\metadata"
         self.device = torch.device("cuda:0")
-        self.net = nn.DataParallel(autoencoder.AutoCoder1(self.device)).to(self.device)
-        self.net.load_state_dict(torch.load("C:\\Users\\lily\\PycharmProjects\\zhangruoyi\\yolov5\\auto_encoder\\model1.pt"))
-
+        self.latency = [0.6077, 0.3805, 0.1492, 0.2721, 0.2264, 0.348, 0.3874, 0.4011, 0.2972, 0.676, 0.6571
+            , 0.1155, 0.3112, 0.9992, 0.1762, 0.5091, 0.2141, 0.8271, 0.1772, 0.6905, 0.4102, 0.1213, 0.9285
+            , 0.6291, 0.1851]
         self.client_num = 25
         self._type = _type
         self.lamda = 0.5
-        # 均一化系数
-        self.sigma = 40
-        # with open(self.meta_url, "r") as file:
-        #     self.metadata = json.loads(file.read()).get(_type)
-        with open("C:\\Users\\lily\\PycharmProjects\\zhangruoyi\\yolov5\\auto_encoder\\codes2", "r") as file:
-            self.codes = json.loads(file.read())[_type]
-        self.model_lvl = ["epoch0", "epoch32","epoch64","epoch96","last"]
-        self.model_urls = ["C:\\Users\\lily\\PycharmProjects\\zhangruoyi\\yolov5\\results2\\{}\\client{}\\train\\weights\\{}.pt"
-                           .format(_type, i, self.model_lvl[i % len(self.model_lvl)])
-                           for i in range(self.client_num)]
+        epochs = [16,32,64,128,256]
+        models_url = "./model_25/high_way/client{}/epoch_{}.pth"
+        self.models = [torch.load(models_url.format(i, epochs[i % 5] - 1), map_location=self.device) for i in range(25)]
+        self.now_model = None
+        self.end = 5
+        self.val_helper = ValHelper()
+
         # 标记client是否被选中
         self.tag = [0 for i in range(self.client_num)]
-        self.now_loss = 1
-        self.latency = 0
-        self.model = None
+        self.now_ap50 = 0
+        self.last_reward = 0
         self.step = 0
-        self.last_reward = -100
-        # opt不涉及到模型，所以可以隨便弄
-        self.opt = train_class.Opt(
-            weights='C:\\Users\\lily\\PycharmProjects\\zhangruoyi\\yolov5\\results2\\{}\\client0\\train\\weights\\best.pt',
-            device='0',
-            data='C:\\Users\\lily\\PycharmProjects\\Finland_road_data\\yolo_data\\ymls\\{}\\val.yaml'.format(_type), epochs=1,
-            )
-        self.helper = train_class.TrainingHelper(self.opt)
-        # 先跑一次吧数据集缓存起来
-        self.helper.model_val(torch.load(
-            'C:\\Users\\lily\\PycharmProjects\\zhangruoyi\\yolov5\\results2\\{}\\client0\\train\\weights\\best.pt'
-            .format(_type))['model'].to(torch.device("cuda")))
+        self.selected = 0
+        self.punishment = 0
 
 
     def reset(self):
         self.step = 0
-        self.model = None
-        self.latency = 0
-        self.now_loss = 1
+        self.now_model = None
         self.tag = [0 for i in range(self.client_num)]
-        self.last_reward = -100
+        self.last_reward = 0
+        self.selected = 0
+        self.punishment = 0
 
+
+    def get_latency(self):
+        tmp = 0
+        for i in range(self.client_num):
+            if self.tag[i] == 1 and self.latency[i] > tmp:
+                tmp = self.latency[i]
+        return tmp
 
     def get_state(self):
-        states = [self.now_loss, self.latency, self.lamda]
+        states = []
         # 添加當前模型的向量值
-        if self.model is None:
-            states.extend([0 for i in range(16)])
+        if self.now_model is None:
+            states.extend([0 for i in range(10)])
+            pca25 = get_pca_by_model([get_params_by_model(model).cpu().numpy() for model in self.models])
+            # 添加模型的向量值
+            for i in range(self.client_num):
+                if self.tag[i] == 1:
+                    states.extend([0 for i in range(10)])
+                    states.append(0)
+                else:
+                    states.extend(pca25[i])
+                    states.append(self.latency[i])
+
         else:
             # todo 展开模型
-            item = train_class.expandModel(self.model)
-            item = np.resize(item, (1, 7031250))
-            x = torch.from_numpy(np.array([item])).to(self.device, torch.float)
-            now_model = self.net.forward(x).detach().cpu().numpy()
-            now_model = np.resize(now_model, (16)).tolist()
-            states.extend(now_model)
-        # 添加其他模型的向量值
-        for i in range(self.client_num):
-            if self.tag[i] == 1:
-                states.extend([0 for i in range(16)])
-            else:
-                states.extend(self.codes[i])
-        return  states
-    # （25+1） * 16 + loss + latency
-
-    def get_loss(self):
-        self.now_loss = self.helper.model_val(self.model)[0][4]
-    def get_reward(self):
-        loss = self.now_loss * self.sigma
-        return 1 / (self.lamda * loss + (1 - self.lamda) * self.latency)
-
-    # 目前定义26个维度，25个client+1个终止, action是從0開始的
-    def next(self, action, decision_time):
-        valid = True
-        if action < 25:
-            _t = time.time()
-            if self.tag[action] == 0:
-                # 融合
-                if self.step == 0:
-                    self.model = torch.load(self.model_urls[action])['model'].to(torch.device("cuda"))
+            models = [get_params_by_model(self.now_model).cpu().numpy()]
+            models.extend([get_params_by_model(model).cpu().numpy() for model in self.models])
+            # models now + 25 = 26
+            pca26 = get_pca_by_model(models)
+            states.extend(pca26[0])
+            # 添加模型的向量值
+            for i in range(self.client_num):
+                if self.tag[i] == 1:
+                    states.extend([0 for i in range(10)])
+                    states.append(0)
                 else:
-                    # todo 叠加模型
-                    self.model = train_class.sum_model(self.model,
-                                                       torch.load(self.model_urls[action])['model']
-                                                       .to(torch.device("cuda")),
-                                                       self.step)
-                self.latency += time.time() - _t + decision_time
-                self.step += 1
-                self.tag[action] = 1
-                self.get_loss()
-            else:
-                valid = False
-                # 额外的惩罚
-                # self.latency += 1
-                self.latency += time.time() - _t + decision_time
-            self.last_reward = self.get_reward()
-            return self.get_state(), (self.lamda - 1) / 10 if valid else (self.lamda - 1) / 2, 0, valid
-        return self.get_state(), self.last_reward, 1, False
+                    states.extend(pca26[i + 1])
+                    states.append(self.latency[i])
 
-# 生成环境模型在特征向量
-if __name__ == '__main__':
-    from train_class import getParamlistByModel
-    import torch.nn as nn
-    road_type = ["crossing", "high_way", "main_road", "total"]
-    model_lvl = ["epoch0", "epoch32","epoch64","epoch96","last"]
-    model_url = "C:\\Users\\lily\\PycharmProjects\\zhangruoyi\\yolov5\\results2\\{}\\client{}\\train\\weights\\{}.pt"
-    device = torch.device("cuda:0")
-    net = nn.DataParallel(autoencoder.AutoCoder1(device)).to(device)
-    aa = torch.load("C:\\Users\\lily\\PycharmProjects\\zhangruoyi\\yolov5\\auto_encoder\\model1.pt")
-    net.load_state_dict(aa)
-    encoder_code = {}
-    for _t in road_type:
-        tmps = []
-        for i in range(25):
-            url = model_url.format(_t, i, model_lvl[i % len(model_lvl)])
-            item = train_class.getParamlistByModel(url)
-            item = np.resize(item, (1, 7031250))
-            x = torch.from_numpy(np.array([item])).to(device, torch.float)
-            x = net.forward(x)
-            x = x.detach().cpu().numpy()
-            x = np.resize(x, (16)).tolist()
-            tmps.append(x)
-        encoder_code.update({_t: tmps})
-    with open("C:\\Users\\lily\\PycharmProjects\\zhangruoyi\\yolov5\\auto_encoder\\codes2", "w") as file:
-        file.write(json.dumps(encoder_code))
+        return  states
+    # 10 +  25 * (10+1)
+
+    def get_reward(self):
+        self.now_ap50 = self.val_helper.val(self.now_model)[2]
+        return self.lamda * self.now_ap50 - (1 - self.lamda) * self.get_latency()
+
+    # 目前定义25个维度 action是從0開始的
+    def next(self, action):
+        valid = True
+        if self.tag[action] == 0:
+            # 融合
+            if self.step == 0:
+                self.now_model = self.models[action]
+            else:
+                # todo 叠加模型
+                self.now_model = sum_model(self.now_model,self.models[action],self.step)
+            self.step += 1
+            self.tag[action] = 1
+        else:
+            valid = False
+
+        if self.step == self.end:
+            self.last_reward = self.get_reward()
+            return self.get_state(), self.last_reward, 1, False
+        return self.get_state(), 0.1 if valid else -1, 0, valid
+
+class ValHelper:
+    def __init__(self):
+        self.data_url = "./dqn.data"
+        self.cfg = utils.utils.load_datafile(self.data_url)
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+        self.model = detector.Detector(self.cfg["classes"], self.cfg["anchor_num"], True).to(self.device)
+
+        val_dataset = utils.datasets.TensorDataset(self.cfg["val"], self.cfg["width"], self.cfg["height"], imgaug=False)
+        batch_size = int(self.cfg["batch_size"] / self.cfg["subdivisions"])
+        nw = min([os.cpu_count(), batch_size if batch_size > 1 else 0, 8])
+
+        self.val_dataloader = torch.utils.data.DataLoader(val_dataset,
+                                                     batch_size=batch_size,
+                                                     shuffle=False,
+                                                     collate_fn=utils.datasets.collate_fn,
+                                                     num_workers=nw,
+                                                     pin_memory=True,
+                                                     drop_last=False,
+                                                     persistent_workers=True
+                                                     )
+
+
+    def val(self, state_dict):
+        self.model.load_state_dict(state_dict)
+        result = [0,0,0,0]
+        self.model.eval()
+        # 模型评估
+        _, _, AP, _ = utils.utils.evaluation(self.val_dataloader, self.cfg, self.model, self.device)
+        precision, recall, _, f1 = utils.utils.evaluation(self.val_dataloader, self.cfg, self.model, self.device, 0.3)
+        result[0] = precision
+        result[1] = recall
+        result[2] = AP
+        result[3] = f1
+        return result
+
+
+

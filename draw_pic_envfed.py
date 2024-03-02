@@ -37,7 +37,7 @@ def loss_prec():
             _prec = 0
             for j in range(25):
                 client = _data[j]
-                _prec += client[i][0]
+                _prec += client[i][2]
             prec.append(_prec / 25)
         precs.append(prec)
 
@@ -58,7 +58,45 @@ def loss_prec():
 
     plt.show()
 
-# loss_prec()
+loss_prec()
+
+def loss_prec2():
+    with open("model_val_data", "r")as file:
+        data = json.loads(file.read())
+    road_type = ["crossing", "high_way", "main_road", "total"]
+    period = [16, 32, 64, 128, 256]
+    precs = []
+    for pos, road_typ in enumerate(road_type):
+        _data = data[pos]
+        prec = []
+        for i in range(256):
+            _prec = 0
+            size = 0
+            for j in range(25):
+                client = _data[j]
+                if i < period[j % 5]:
+                    _prec += client[i][2]
+                    size += 1
+            prec.append(_prec / size)
+        precs.append(prec)
+
+    x = [i for i in range(1, 257)]
+
+    # 第一组折线，使用左侧Y轴
+    ax.plot(x, precs[0],linestyle='-', label='precision_' + road_type[0])  # 绿色实线
+    ax.plot(x, precs[1],linestyle='-', label='precision_' +road_type[1])  # 绿色实线
+    ax.plot(x, precs[2],linestyle='-', label='precision_' +road_type[2])  # 绿色实线
+    ax.plot(x, precs[3],linestyle='-', label='precision_' +road_type[3])  # 绿色实线
+    ax.set_xlabel('Period')
+    ax.set_ylabel('AP50')
+    # ax.tick_params(axis='y', labelcolor='g')
+
+
+    # 可选：增加图例
+    fig.legend(loc='center right', bbox_to_anchor=(0.9,0.4))
+
+    plt.show()
+
 def draw_dqn_reward_loss(pos):
     # pos = 2
     rate = ["0.1", "0.3", "0.5", "0.7","0.9",]

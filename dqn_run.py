@@ -27,7 +27,7 @@ if __name__ == '__main__':
     for _type in [1,2,3,0]:
         lam = [0.1, 0.3, 0.5, 0.7, 0.9]
         for la in lam:
-            area = environment.Type.crossing.value
+            area = environment.Type.high_way.value
             # sigma = 0.3  # 高斯噪声标准差
             device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
             total_step = 0
@@ -36,8 +36,8 @@ if __name__ == '__main__':
 
             replay_buffer = ReplayBuffer(buffer_size, batch_size)
             replay_bufferN = ReplayBufferN(buffer_size, batch_size)
-            agent = net.DDQN(device, 3 + 16 * (25 + 1), 25 + 1, area + "_6_" + str(la), epsilon=0.10)
-            agent2 = net2.DDQN(device, 3 + 16 * (25 + 1), 25 + 1, area + "_6_" + str(la), epsilon=0.10)
+            agent = net.DDQN(device, 10 + 11 * 25, 25, area + "_1_" + str(la), epsilon=0.05)
+            agent2 = net2.DDQN(device, 10 + 11 * 25, 25, area + "_1_" + str(la), epsilon=0.05)
 
             return_list = []
             loss_data = []
@@ -57,10 +57,9 @@ if __name__ == '__main__':
                 _step = 0
                 while True:
                     state = env.get_state()
-                    decision_time = time.time()
                     if _type == 0:
                         action = agent.take_action(state)
-                        next_state, reward, done, valid = env.next(action, time.time() - decision_time)
+                        next_state, reward, done, valid = env.next(action)
                         if valid:
                             _step += 1
                         replay_buffer.add(state,action,reward,next_state,done)
@@ -81,20 +80,17 @@ if __name__ == '__main__':
                             for a_i in range(1):
                                 dqn_loss.append(agent.update(sample))
                                 agent.save_net()
-                            # print("train_time:" + str(time.time() - _t))
                         if done == 1:
                             reward_data.append(env.last_reward)
-                            loss_data.append(env.now_loss)
-                            steps.append(_step)
-                            latency_data.append(env.latency)
+                            latency_data.append(env.get_latency())
                             print(str(_type) + "=============" + str(i_episode) + "=============" + str(env.last_reward))
-                            with open("C:\\Users\\lily\\PycharmProjects\\zhangruoyi\\yolov5\\dqn\\{}_{}_result_6".format(area, la), "w+") as file:
-                                file.write(json.dumps({"reward":reward_data, "loss":loss_data, "steps":steps,
+                            with open("./dqn/{}_{}_result_1".format(area, la), "w+") as file:
+                                file.write(json.dumps({"reward":reward_data,
                                                        "latency":latency_data,"dqn_loss":dqn_loss}))
                             break
                     else:
                         action = agent2.take_action(state)
-                        next_state, reward, done, valid = env.next(action, time.time() - decision_time)
+                        next_state, reward, done, valid = env.next(action)
                         if valid:
                             _step += 1
                         n_step_counter -= 1
@@ -140,13 +136,11 @@ if __name__ == '__main__':
                             # print("train_time:" + str(time.time() - _t))
                         if done == 1:
                             reward_data.append(env.last_reward)
-                            loss_data.append(env.now_loss)
-                            steps.append(_step)
-                            latency_data.append(env.latency)
+                            latency_data.append(env.get_latency())
                             print(str(_type) + "=============" + str(i_episode) + "=============" + str(env.last_reward))
-                            with open("C:\\Users\\lily\\PycharmProjects\\zhangruoyi\\yolov5\\dqn\\{}_{}_{}step_result_6"
+                            with open("./dqn/{}_{}_{}step_result_1"
                                               .format(area, la, n_steps[_type - 1]), "w+") as file:
-                                file.write(json.dumps({"reward":reward_data, "loss":loss_data, "steps":steps,
+                                file.write(json.dumps({"reward":reward_data,
                                                        "latency":latency_data, "dqn_loss":dqn_loss}))
                             break
 
