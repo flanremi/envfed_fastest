@@ -83,7 +83,7 @@ if __name__ == '__main__':
                         if done == 1:
                             reward_data.append(env.last_reward)
                             latency_data.append(env.get_latency())
-                            print(str(_type) + "=============" + str(i_episode) + "=============" + str(env.last_reward))
+                            print(str(_type) + "=============" + str(i_episode) + "=============" + str(env.last_reward) + "=============" + str(total_step))
                             with open("./dqn/{}_{}_result_1".format(area, la), "w+") as file:
                                 file.write(json.dumps({"reward":reward_data,
                                                        "latency":latency_data,"dqn_loss":dqn_loss}))
@@ -137,7 +137,7 @@ if __name__ == '__main__':
                         if done == 1:
                             reward_data.append(env.last_reward)
                             latency_data.append(env.get_latency())
-                            print(str(_type) + "=============" + str(i_episode) + "=============" + str(env.last_reward))
+                            print(str(_type) + "=============" + str(i_episode) + "=============" + str(env.last_reward) + "=============" + str(total_step))
                             with open("./dqn/{}_{}_{}step_result_1"
                                               .format(area, la, n_steps[_type - 1]), "w+") as file:
                                 file.write(json.dumps({"reward":reward_data,
