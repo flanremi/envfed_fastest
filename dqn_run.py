@@ -25,7 +25,8 @@ n_steps = [1, 3, 5]
 
 if __name__ == '__main__':
     for _type in [1,2,3,0]:
-        lam = [0.1, 0.3, 0.5, 0.7, 0.9]
+        # lam = [0.1, 0.3, 0.5, 0.7, 0.9]
+        lam = [0.5]
         for la in lam:
             area = environment.Type.high_way.value
             # sigma = 0.3  # 高斯噪声标准差

@@ -24,6 +24,13 @@ colors = ['#2878b5', '#9ac9db', '#7fa5b7', '#1ebc61', '#f26647', "#AD11F5"]
 # 该图先训练出5个档位的mdp，然后随便选3个场景中的一个来得出点即可
 
 #metadata 0 prec 4 loss
+def test():
+    with open("./dqn/test", "r") as file:
+        data = json.loads(file.read())
+    ax.plot([i for i in range(1, 5001)], data, linestyle='-', )
+    plt.show()
+test()
+
 
 def loss_prec():
     with open("model_val_data", "r")as file:
@@ -58,7 +65,6 @@ def loss_prec():
 
     plt.show()
 
-loss_prec()
 
 def loss_prec2():
     with open("model_val_data", "r")as file:

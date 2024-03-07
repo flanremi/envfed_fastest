@@ -53,7 +53,7 @@ class DDQN:
         self.device = device
 
     def take_action(self, state):  # epsilon-贪婪策略采取动作
-        if np.random.random() < self.laos:
+        if np.random.random() < self.epsilon:
             action = np.random.randint(self.action_dim)
         else:
             state = torch.tensor([state], dtype=torch.float).to(self.device)

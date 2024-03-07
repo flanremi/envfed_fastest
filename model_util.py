@@ -21,6 +21,7 @@ def get_params_by_model(model):
     # tmp = tmp.reshape([1,262144])
     return tmp
 
+# step 从0开始
 def sum_model(old_model, new_model, step):
     tmp_dict = {}
     for key, var in old_model.items():

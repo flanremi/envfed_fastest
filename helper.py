@@ -93,7 +93,7 @@ def get_val_data():
 
 
 def get_25_lantency():
-    print([random.randint(1000, 10000) / 10000 for i in range(25)])
+    print([random.randint(1000, 6000) / 10000 for i in range(25)])
 
 # 制作测试集文件
 def create_val_data():
@@ -119,8 +119,57 @@ def create_val_data():
     with open("./dqn_val_data", "w") as file:
         file.write(tmp_val)
 
+# ========================================================
+def gatherAllData():
+    dir_url = "C:\\Users\\lily\\PycharmProjects\\Finland_road_data\\yolo_data\\clients\\crossing\\clinet{}\\"
+    target_url = "C:\\Users\\lily\\PycharmProjects\\Finland_road_data\\yolo_data\\clients\\now_crossing\\"
+    for i in range(25):
+        for t_url in ["", "_val"]:
+            a = dir_url.format(str(i) + t_url)
+            files = get_all_filenames(a)
+            for file in files:
+                if file.find("labels.cache") == -1:
+                    shutil.move(file, target_url)
 
 
+def gather_val():
+    val_url = "C:\\Users\\lily\\PycharmProjects\\Finland_road_data\\yolo_data\\clients\\now_crossing\\client{}_val\\"
+    dir_url = "C:\\Users\\lily\\PycharmProjects\\Finland_road_data\\yolo_data\\clients\\now_crossing\\client{}\\"
+    for cli in range(10):
+        if not os.path.exists(val_url.format(cli)):
+            os.mkdir(val_url.format(cli))
+        for i in range(36):
+            files = get_all_filenames(dir_url.format(cli))
+            pos = random.randint(0, int(len(files)/2) - 1)
+            shutil.move(files[pos * 2], val_url.format(cli))
+            shutil.move(files[pos * 2 + 1], val_url.format(cli))
+
+def split_client():
+    dir_url = "C:\\Users\\lily\\PycharmProjects\\Finland_road_data\\yolo_data\\clients\\now_crossing\\"
+    files = get_all_filenames(dir_url)
+    for i in range(10):
+        target_url = dir_url + "client" + str(i) + "\\"
+        os.mkdir(target_url)
+        l = int(len(files) / 20)
+        for j in range(l):
+            shutil.move(files[(l * i  + j) * 2], target_url)
+            shutil.move(files[(l * i  + j) * 2 + 1], target_url)
+# 制作新的测试集文件
+def create_now_data():
+    val_url = "C:\\Users\\lily\\PycharmProjects\\Finland_road_data\\yolo_data\\clients\\now_crossing\\client{}_val\\"
+    dir_url = "C:\\Users\\lily\\PycharmProjects\\Finland_road_data\\yolo_data\\clients\\now_crossing\\client{}\\"
+    for i in range(10):
+        with open("./model.data", "r") as file:
+            tmp = file.read()
+        tmp = tmp.format("./new_model_25/client" + str(i) + "/", i % 3 + 1,
+                    "./modelzoo/coco2017-0.241078ap-model.pth",
+                    dir_url.format(i),
+                    val_url.format(i))
+        with open("./new_data_25/client{}.data".format(i), "w") as f:
+            f.write(tmp)
+
+create_now_data()
+# getherAllData()
 # get_val_data()
 # create_txt()
 # create_data()

@@ -33,9 +33,9 @@ class Environment:
         super().__init__()
         # self.meta_url = "C:\\Users\\lily\\PycharmProjects\\zhangruoyi\\yolov5\\results2\\metadata"
         self.device = torch.device("cuda:0")
-        self.latency = [0.6077, 0.3805, 0.1492, 0.2721, 0.2264, 0.348, 0.3874, 0.4011, 0.2972, 0.676, 0.6571
-            , 0.1155, 0.3112, 0.9992, 0.1762, 0.5091, 0.2141, 0.8271, 0.1772, 0.6905, 0.4102, 0.1213, 0.9285
-            , 0.6291, 0.1851]
+        self.latency = [0.4987, 0.5822, 0.4846, 0.4974, 0.3972, 0.2352, 0.4582, 0.1177, 0.5522, 0.2663,
+                        0.5906, 0.5494, 0.1386, 0.3238, 0.5497, 0.4256, 0.5062, 0.2681, 0.1058, 0.3328,
+                        0.1, 0.5825, 0.2939, 0.3625, 0.2782]
         self.client_num = 25
         self._type = _type
         self.lamda = 0.5
@@ -127,7 +127,7 @@ class Environment:
         if self.step == self.end:
             self.last_reward = self.get_reward()
             return self.get_state(), self.last_reward, 1, False
-        return self.get_state(), 0.1 if valid else -1, 0, valid
+        return self.get_state(), 0.1 if valid else -0.1, 0, valid
 
 class ValHelper:
     def __init__(self):
@@ -166,4 +166,20 @@ class ValHelper:
         return result
 
 
-
+if __name__ == '__main__':
+    area = Type.high_way.value
+    # sigma = 0.3  # 高斯噪声标准差
+    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+    total_step = 0
+    env = Environment(area)
+    env.lamda = 0.5
+    env.now_model = env.models[3]
+    print(env.val_helper.val(env.now_model))
+    env.now_model = sum_model(env.now_model,env.models[9],0)
+    print(env.val_helper.val(env.now_model))
+    env.now_model = sum_model(env.now_model,env.models[14],1)
+    print(env.val_helper.val(env.now_model))
+    env.now_model = sum_model(env.now_model,env.models[19],2)
+    print(env.val_helper.val(env.now_model))
+    env.now_model = sum_model(env.now_model,env.models[24],3)
+    print(env.val_helper.val(env.now_model))
